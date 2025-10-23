@@ -1,7 +1,4 @@
-import { routeAgentRequest, type Schedule } from "agents";
-
-import { getSchedulePrompt } from "agents/schedule";
-
+import { routeAgentRequest } from "agents";
 import { AIChatAgent } from "agents/ai-chat-agent";
 import {
   generateId,
@@ -13,12 +10,11 @@ import {
   createUIMessageStreamResponse,
   type ToolSet
 } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { processToolCalls, cleanupMessages } from "./utils";
 import { tools, executions } from "./tools";
+import { createWorkersAI } from "workers-ai-provider";
 // import { env } from "cloudflare:workers";
 
-const model = openai("gpt-4o-2024-11-20");
 // Cloudflare AI Gateway
 // const openai = createOpenAI({
 //   apiKey: env.OPENAI_API_KEY,
@@ -46,6 +42,10 @@ export class Chat extends AIChatAgent<Env> {
       ...this.mcp.getAITools()
     };
 
+    const workersai = createWorkersAI({ binding: this.env.AI });
+
+    const model = workersai("@cf/meta/llama-3.2-3b-instruct");
+
     const stream = createUIMessageStream({
       execute: async ({ writer }) => {
         // Clean up incomplete tool calls to prevent API errors
@@ -61,21 +61,21 @@ export class Chat extends AIChatAgent<Env> {
         });
 
         const result = streamText({
-          system: `You are a helpful assistant that can do various tasks... 
-
-${getSchedulePrompt({ date: new Date() })}
-
-If the user asks to schedule a task, use the schedule tool to schedule the task.
-`,
+          system: `You are a coding agent, you help the user with whatever coding problem they have,
+          for example, given some code, understand what it is trying to accomplish from the user and try to optimise it as best as possible. 
+          If the user does not provide code, help them in any other way you can with coding related tasks.
+          Keep your responses concise and to the point, provide code snippets where possible and make sure your points are separated well. 
+          Wherever you decide to make text bold, make sure the line before this text is an empty line to allow good separation of points.
+          For any code snippets, use markdown formatting with the appropriate language tags.`,
 
           messages: convertToModelMessages(processedMessages),
           model,
-          tools: allTools,
-          // Type boundary: streamText expects specific tool types, but base class uses ToolSet
-          // This is safe because our tools satisfy ToolSet interface (verified by 'satisfies' in tools.ts)
+          // tools: allTools,
+
           onFinish: onFinish as unknown as StreamTextOnFinishCallback<
             typeof allTools
           >,
+          maxOutputTokens: 6000,
           stopWhen: stepCountIs(10)
         });
 
@@ -85,24 +85,6 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
 
     return createUIMessageStreamResponse({ stream });
   }
-  async executeTask(description: string, _task: Schedule<string>) {
-    await this.saveMessages([
-      ...this.messages,
-      {
-        id: generateId(),
-        role: "user",
-        parts: [
-          {
-            type: "text",
-            text: `Running scheduled task: ${description}`
-          }
-        ],
-        metadata: {
-          createdAt: new Date()
-        }
-      }
-    ]);
-  }
 }
 
 /**
@@ -110,19 +92,6 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
  */
 export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext) {
-    const url = new URL(request.url);
-
-    if (url.pathname === "/check-open-ai-key") {
-      const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
-      return Response.json({
-        success: hasOpenAIKey
-      });
-    }
-    if (!process.env.OPENAI_API_KEY) {
-      console.error(
-        "OPENAI_API_KEY is not set, don't forget to set it locally in .dev.vars, and use `wrangler secret bulk .dev.vars` to upload it to production"
-      );
-    }
     return (
       // Route the request to our agent or return 404 if not found
       (await routeAgentRequest(request, env)) ||
