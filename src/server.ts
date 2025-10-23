@@ -13,13 +13,6 @@ import {
 import { processToolCalls, cleanupMessages } from "./utils";
 import { tools, executions } from "./tools";
 import { createWorkersAI } from "workers-ai-provider";
-// import { env } from "cloudflare:workers";
-
-// Cloudflare AI Gateway
-// const openai = createOpenAI({
-//   apiKey: env.OPENAI_API_KEY,
-//   baseURL: env.GATEWAY_BASE_URL,
-// });
 
 /**
  * Chat Agent implementation that handles real-time AI chat interactions
@@ -32,10 +25,6 @@ export class Chat extends AIChatAgent<Env> {
     onFinish: StreamTextOnFinishCallback<ToolSet>,
     _options?: { abortSignal?: AbortSignal }
   ) {
-    // const mcpConnection = await this.mcp.connect(
-    //   "https://path-to-mcp-server/sse"
-    // );
-
     // Collect all tools, including MCP tools
     const allTools = {
       ...tools,
@@ -70,7 +59,7 @@ export class Chat extends AIChatAgent<Env> {
 
           messages: convertToModelMessages(processedMessages),
           model,
-          // tools: allTools,
+          // tools: allTools, // (Tools seem to be break the chat model)
 
           onFinish: onFinish as unknown as StreamTextOnFinishCallback<
             typeof allTools
