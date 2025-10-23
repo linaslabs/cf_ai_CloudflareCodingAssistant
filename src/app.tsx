@@ -162,7 +162,7 @@ export default function Chat() {
 
           <div className="flex-1">
             <h2 className="font-semibold text-base">
-              Gizmo - Your AI Coding Agent
+              Gizmo - Your AI Coding Assistant
             </h2>
           </div>
 
