@@ -1,7 +1,6 @@
 import { routeAgentRequest } from "agents";
 import { AIChatAgent } from "agents/ai-chat-agent";
 import {
-  generateId,
   streamText,
   type StreamTextOnFinishCallback,
   stepCountIs,
